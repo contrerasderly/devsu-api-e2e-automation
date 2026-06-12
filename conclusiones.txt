@@ -1,0 +1,138 @@
+======================================================
+  DEVSU - QA AUTOMATION EXERCISE
+  HALLAZGOS Y CONCLUSIONES
+======================================================
+
+
+──────────────────────────────────────────
+  1. HALLAZGOS — E2E CON CYPRESS + CUCUMBER
+──────────────────────────────────────────
+
+H1. Saucedemo usa atributos "data-test" en los elementos clave (e.g., data-test="checkout",
+    data-test="firstName"), lo que facilita la escritura de selectores estables que no se
+    rompen ante cambios de estilos o clases CSS. Se priorizaron estos sobre clases CSS.
+
+H2. El flujo de checkout de Saucedemo es completamente sincrónico (sin llamadas AJAX
+    intermedias entre pasos), lo que hace innecesario el uso de cy.intercept() o esperas
+    artificiales. Los comandos de Cypress con assertions son suficientes para el control
+    de flujo.
+
+H3. La implementación del patrón Page Object Model (POM) separa claramente la lógica
+    de interacción con el DOM de los pasos Gherkin. Esto permite reutilizar páginas
+    en múltiples features sin duplicar selectores.
+
+H4. El Cucumber Preprocessor (@badeball/cypress-cucumber-preprocessor) requiere
+    configuración explícita del bundler (esbuild) en cypress.config.js. La configuración
+    del preprocessor puede vivir directamente en package.json bajo la clave
+    "cypress-cucumber-preprocessor", eliminando la necesidad de un archivo de
+    configuración separado.
+
+H5. Los reportes de Cypress generados por el Cucumber Preprocessor (HTML nativo) son
+    funcionales pero limitados. La librería multiple-cucumber-html-reporter produce
+    reportes más ricos con metadata del entorno, tiempos de ejecución y capturas.
+
+H6. La opción "video: true" en cypress.config.js graba la ejecución completa de cada
+    escenario, lo que resulta invaluable para depurar fallos en CI/CD donde no hay
+    interfaz gráfica disponible.
+
+
+──────────────────────────────────────────
+  2. HALLAZGOS — API CON KARATE + GHERKIN
+──────────────────────────────────────────
+
+H7. La API pública de Petstore (https://petstore.swagger.io) es una API compartida en
+    internet, lo que implica que los datos pueden ser modificados o eliminados por otros
+    usuarios entre pasos. Para mitigar esto, el ID de la mascota se genera aleatoriamente
+    en cada ejecución usando Math.floor(Math.random() * 9000000) + 1000000, reduciendo
+    drásticamente la probabilidad de colisiones.
+
+H8. Karate permite expresiones JavaScript inline (karate.filter(), Math.floor(), etc.)
+    directamente dentro de los archivos .feature, lo que facilita transformaciones y
+    filtrados de datos sin necesidad de código Java adicional.
+
+H9. La función karate.filter() fue necesaria en el PASO 4 (búsqueda por estado "sold")
+    porque el endpoint /pet/findByStatus devuelve todos los pets vendidos de todos los
+    usuarios de la API compartida, no sólo el creado en el test. Filtrar por ID garantiza
+    que la aserción apunte exactamente a la mascota del escenario.
+
+H10. El endpoint PUT /pet de Petstore requiere enviar el objeto completo (no soporta
+     PATCH parcial). Omitir campos como photoUrls o category en el body de actualización
+     puede resultar en pérdida de datos o errores de validación del servidor.
+
+H11. Karate genera automáticamente un reporte HTML detallado en target/karate-reports/
+     que incluye el timeline de cada paso, los request/response bodies completos y el
+     resultado por escenario. Esto es útil para auditorías de testing sin configuración
+     adicional.
+
+H12. La integración de cucumber-reporting (net.masterthought) con Karate requiere leer
+     los JSON de Karate desde target/karate-reports/ en el hook @AfterAll. Karate no
+     genera automáticamente el formato JSON de Cucumber; lo genera en su propio formato
+     JSON que el ReportBuilder de masterthought puede consumir.
+
+
+──────────────────────────────────────────
+  3. CONCLUSIONES GENERALES
+──────────────────────────────────────────
+
+C1. ELECCIÓN DE HERRAMIENTAS
+    Cypress + Cucumber es una combinación sólida para E2E en aplicaciones web modernas.
+    Cypress ofrece recarga automática, viaje en el tiempo (time-travel debugging) y
+    esperas inteligentes, mientras que Cucumber aporta la capa de lenguaje natural
+    (Gherkin) que permite que stakeholders no técnicos lean y validen los escenarios.
+
+    Karate se destaca como framework de API testing por integrar Gherkin, HTTP client,
+    assertions y scripting JavaScript en un único DSL sin necesidad de librerías externas.
+    Su curva de aprendizaje es menor que alternativas como RestAssured + JUnit puro.
+
+C2. PATRÓN PAGE OBJECT MODEL (POM)
+    El POM aplicado en Cypress centraliza los selectores y las acciones por página,
+    reduciendo el impacto de cambios en el DOM a un único archivo. Un cambio en el
+    selector de un botón sólo requiere actualizar la Page Class, no los step definitions.
+
+C3. ESTABILIDAD DE TESTS
+    Usar selectores semánticos (data-test attributes, IDs) sobre selectores frágiles
+    (clases CSS de componentes UI, XPath posicionales) es la práctica más importante
+    para la estabilidad a largo plazo de los tests E2E.
+
+C4. GESTIÓN DE DATOS DE PRUEBA EN APIS COMPARTIDAS
+    En APIs públicas, la generación dinámica de IDs y la limpieza de datos post-test
+    son fundamentales. Para entornos productivos se recomienda agregar un paso de
+    teardown (DELETE /pet/{id}) al final del escenario Karate para no contaminar el
+    estado de la API.
+
+C5. REPORTING
+    La evidencia generada (HTML interactivo, videos, JSON de resultados) es suficiente
+    para sustentar la implementación frente a stakeholders y sirve como línea base para
+    comparar regresiones en futuras ejecuciones.
+
+C6. ESCALABILIDAD
+    La arquitectura implementada es escalable:
+      - Nuevos escenarios E2E: agregar pasos en el .feature y reutilizar Page Objects.
+      - Nuevos endpoints API: agregar nuevos Scenario dentro del mismo feature o crear
+        features adicionales bajo src/test/resources/petstore/.
+      - Múltiples ambientes: parametrizar baseUrl en karate-config.js con
+        karate.env y en cypress.config.js con variables de entorno.
+
+C7. INTEGRACIÓN CI/CD
+    Ambos proyectos son compatibles con pipelines CI/CD (GitHub Actions, Jenkins, etc.):
+      - Cypress: ejecutar con npm run cy:run:headless
+      - Karate:  ejecutar con mvn clean test -B
+    Los reportes HTML se pueden publicar como artefactos del pipeline.
+
+
+======================================================
+  RESUMEN DE COBERTURA
+======================================================
+
+  E2E (Cypress + Cucumber):
+    ✔ Autenticación con standard_user / secret_sauce
+    ✔ Agregar dos productos al carrito
+    ✔ Visualizar el carrito con los dos productos
+    ✔ Completar formulario de compra (nombre, apellido, código postal)
+    ✔ Finalizar compra y confirmar "Thank you for your order!"
+
+  API (Karate + Gherkin):
+    ✔ POST /pet — Añadir una mascota con datos completos
+    ✔ GET /pet/{id} — Consultar la mascota por su ID
+    ✔ PUT /pet — Actualizar nombre a "Firulais Updated" y estado a "sold"
+    ✔ GET /pet/findByStatus?status=sold — Consultar mascota modificada por estado

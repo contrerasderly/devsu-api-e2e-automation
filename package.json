@@ -1,0 +1,15 @@
+{
+  "name": "devsu-qa-automation",
+  "version": "1.0.0",
+  "description": "Devsu QA Automation — E2E (Cypress) + API (Karate)",
+  "scripts": {
+    "test": "concurrently --names \"API,E2E\" --prefix-colors \"bgBlue.white,bgGreen.white\" --kill-others-on-fail \"npm run test:api\" \"npm run test:e2e\"",
+    "test:api": "cd api && mvn clean test",
+    "test:e2e": "cd e2e && npm run cy:open",
+    "report:api": "cd api && mvn allure:serve",
+    "report:e2e": "cd e2e && npm run allure:serve"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
