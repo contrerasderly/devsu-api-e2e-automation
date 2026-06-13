@@ -1,0 +1,25 @@
+{
+  "name": "devsu-qa-automation",
+  "version": "1.0.0",
+  "description": "Devsu QA Automation — E2E + API (Cypress + Cucumber + Allure)",
+  "scripts": {
+    "test": "env -u ELECTRON_RUN_AS_NODE cypress run --headless --browser chrome --env allure=true",
+    "test:api": "env -u ELECTRON_RUN_AS_NODE cypress run --headless --browser chrome --env allure=true --spec 'cypress/e2e/petstore/**/*.feature'",
+    "test:e2e": "env -u ELECTRON_RUN_AS_NODE cypress run --headless --browser chrome --env allure=true --spec 'cypress/e2e/saucedemo/**/*.feature'",
+    "open": "env -u ELECTRON_RUN_AS_NODE cypress open",
+    "report": "allure serve cypress/allure-results",
+    "report:generate": "allure generate cypress/allure-results --clean -o cypress/allure-report",
+    "report:open": "allure open cypress/allure-report"
+  },
+  "devDependencies": {
+    "@badeball/cypress-cucumber-preprocessor": "^24.0.1",
+    "@bahmutov/cypress-esbuild-preprocessor": "^2.2.5",
+    "@shelex/cypress-allure-plugin": "^2.40.2",
+    "cypress": "^15.17.0"
+  },
+  "cypress-cucumber-preprocessor": {
+    "stepDefinitions": [
+      "cypress/support/step_definitions/**/*.js"
+    ]
+  }
+}

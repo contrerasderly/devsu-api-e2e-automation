@@ -1,0 +1,172 @@
+  DEVSU - QA AUTOMATION EXERCISE
+  HALLAZGOS Y CONCLUSIONES
+
+  1. HALLAZGOS — E2E CON CYPRESS + CUCUMBER
+  -------------------------------------------
+
+H1.1 Saucedemo usa atributos "data-test" en los elementos clave (e.g., data-test="checkout",
+    data-test="firstName"), lo que facilita la escritura de selectores estables que no se
+    rompen ante cambios de estilos o clases CSS. Se priorizaron estos sobre clases CSS
+
+H1.2 El flujo de checkout de Saucedemo es completamente sincrónico (sin llamadas AJAX
+    intermedias entre pasos), lo que hace innecesario el uso de cy.intercept() o esperas
+    artificiales. Los comandos de Cypress con assertions son suficientes para el control
+    de flujo
+
+H1.3 La implementación del patrón Page Object Model (POM) separa claramente la lógica
+    de interacción con el DOM de los pasos Gherkin. Esto permite reutilizar páginas
+    en múltiples features sin duplicar selectores. Un cambio en el DOM solo requiere
+    actualizar la Page Class correspondiente, no los step definitions
+
+H1.4 El Cucumber Preprocessor (@badeball/cypress-cucumber-preprocessor) requiere
+    configuración explícita del bundler (esbuild) en cypress.config.js. La configuración
+    del preprocessor puede vivir directamente en package.json bajo la clave
+    "cypress-cucumber-preprocessor", eliminando la necesidad de un archivo de
+    configuración separado
+
+H1.5 La opción "video: true" en cypress.config.js graba la ejecución completa de cada
+    escenario, lo que resulta invaluable para depurar fallos en CI/CD donde no hay
+    interfaz gráfica disponible
+
+H1.6 La propiedad "retries.runMode: 1" en cypress.config.js reintenta automáticamente
+    un test fallido antes de marcarlo como error. Esto reduce falsos negativos causados
+    por inestabilidades de red o de la aplicación, sin enmascarar bugs reales
+
+  2. HALLAZGOS — API CON CYPRESS + CUCUMBER
+  -------------------------------------------
+
+H2.1 La API pública de Petstore (https://petstore.swagger.io/v2) es compartida en
+    internet, lo que implica que los datos pueden ser modificados o eliminados por otros
+    usuarios entre pasos. Para mitigar colisiones, el ID de la mascota se genera
+    aleatoriamente en cada ejecución:
+      petId = Math.floor(Math.random() * 9000000) + 1000000
+
+H2.2 cy.request() ejecuta peticiones HTTP directamente, sin levantar un navegador.
+    Esto hace las pruebas de API significativamente más rápidas que las pruebas E2E
+    y permite validar el backend de forma aislada del frontend
+
+H2.3 El sistema de alias de Cypress (.as('response') / cy.get('@response')) es el
+    mecanismo correcto para compartir el resultado de cy.request() entre un paso
+    When y su correspondiente paso Then. Intentar retornar el valor directamente
+    de un When no funciona por la naturaleza asíncrona de la cadena de comandos
+    de Cypress
+
+H2.4 El endpoint PUT /pet de Petstore no soporta actualización parcial (PATCH).
+     Requiere enviar el objeto completo en el body. Omitir campos como photoUrls
+     o category puede resultar en pérdida de datos o errores de validación 400
+
+H2.5 El endpoint GET /pet/findByStatus?status=sold devuelve todas las mascotas
+     vendidas de todos los usuarios de la API compartida. La verificación debe
+     filtrar por ID (res.body.find(pet => pet.id === petId)) para garantizar que
+     la aserción apunte exactamente a la mascota creada en el escenario, y no a
+     cualquier otra que ya existiera con ese estado
+
+H2.6 Unificar API y E2E en el mismo stack (Cypress + Cucumber) elimina la barrera
+     de contexto entre equipos: un mismo QA puede mantener ambas suites en un único
+     lenguaje (JavaScript) y una única herramienta, reduciendo la curva de onboarding
+
+H2.7 HALLAZGOS DE COMPORTAMIENTO REAL — API Petstore (validación en ejecución):
+
+     a) POST /pet con body vacío {} → retorna 200 (no 405)
+        La API es permisiva: acepta cuerpos vacíos sin rechazarlos, lo que indica
+        ausencia de validación de campos obligatorios en el servidor
+
+     b) POST /pet con { "id": "not_a_number" } → retorna 500 (no 400)
+        El servidor falla internamente al intentar procesar un tipo de dato incorrecto
+        en lugar de retornar un error de validación controlado (400 Bad Request).
+        Esto es un defecto de la API: los errores de entrada del cliente no deberían
+        producir errores 5xx
+
+     Estos comportamientos fueron descubiertos durante la ejecución de los tests
+     @negative y documentados actualizando los status codes esperados en el feature
+     para que reflejen la realidad de la API bajo prueba
+
+  3. HALLAZGOS — ARQUITECTURA COMPARTIDA
+  ---------------------------------------
+
+H3.1 Un único cypress.config.js en la raíz del repositorio sirve a ambas suites
+     (API y E2E). La clave baseUrl se asigna al dominio E2E (Saucedemo) y la URL
+     base de la API se expone vía Cypress.env('apiBaseUrl'). Esta convención evita
+     colisiones de configuración sin necesidad de archivos de configuración por suite
+
+H3.2 Con un único package.json en la raíz, se elimina la duplicación de dependencias
+     y la sincronización de versiones entre paquetes. Un solo npm install
+     --legacy-peer-deps instala todo el árbol de dependencias para ambas suites
+
+H3.3 Los scripts npm (test:api / test:e2e) usan el flag --spec para filtrar qué
+     feature files ejecutar, sin necesidad de configuraciones separadas ni directorios
+     duplicados. Esto simplifica la integración con pipelines CI/CD: cada job solo
+     cambia el script que invoca
+
+  4. CONCLUSIONES GENERALES
+  ---------------------------
+
+C1. UNIFICACIÓN DEL STACK
+    Usar Cypress tanto para pruebas E2E (UI) como para pruebas de API en un mismo
+    repositorio y con el mismo lenguaje (JavaScript + Gherkin) es una decisión
+    arquitectural que reduce la fragmentación tecnológica del equipo de QA. Un solo
+    framework, un solo lenguaje, un solo sistema de reportes
+
+C2. PATRÓN PAGE OBJECT MODEL (POM)
+    El POM aplicado en la suite E2E centraliza los selectores y las acciones por
+    página. Un cambio en el selector de un botón solo requiere actualizar la Page
+    Class, no los step definitions ni el feature file. Esto desacopla la capa de
+    automatización de los detalles de implementación del frontend
+
+C3. ESTABILIDAD DE TESTS
+    Usar selectores semánticos (atributos data-test, IDs) sobre selectores frágiles
+    (clases CSS de componentes UI, XPath posicionales) es la práctica más importante
+    para la estabilidad a largo plazo de los tests E2E. Saucedemo facilita esto al
+    exponer atributos data-test en todos sus elementos interactivos
+
+C4. GESTIÓN DE DATOS EN APIS COMPARTIDAS
+    En APIs públicas, la generación dinámica de IDs por escenario es fundamental para
+    el aislamiento de los tests. Como mejora futura, se recomienda agregar un paso de
+    teardown (DELETE /pet/{id}) al final del escenario para no contaminar el estado
+    de la API entre ejecuciones
+
+C5. REPORTING
+    La integración de @shelex/cypress-allure-plugin genera resultados JSON por cada
+    ejecución que Allure CLI convierte en un reporte HTML interactivo con línea de
+    tiempo, duración por paso y capturas de pantalla. Esta evidencia es suficiente
+    para sustentar la implementación frente a stakeholders técnicos y no técnicos
+
+C6. ESCALABILIDAD
+    La arquitectura implementada es escalable horizontalmente:
+      - Nuevos escenarios E2E: agregar pasos en saucedemo.feature y reutilizar
+        las Page Classes existentes
+      - Nuevos endpoints API: agregar Scenarios en petstore.feature o crear
+        nuevos feature files bajo cypress/e2e/
+      - Nuevas suites: agregar una carpeta bajo cypress/e2e/ con su feature y
+        step definitions; la configuración global en cypress.config.js ya los detecta
+      - Múltiples ambientes: parametrizar baseUrl mediante variables de entorno
+        (CYPRESS_BASE_URL) sin modificar código
+
+C7. INTEGRACIÓN CI/CD
+    El proyecto es compatible con cualquier pipeline CI/CD (GitHub Actions, Jenkins,
+    GitLab CI, etc.)
+
+    Los reportes Allure (allure-results/) pueden publicarse como artefactos del
+    pipeline para trazabilidad histórica de ejecuciones
+
+  RESUMEN DE COBERTURA
+  ---------------------
+  E2E (Cypress + Cucumber — Saucedemo):                           [8 scenarios / 12 tests]
+    ✔ Login exitoso con credenciales válidas                               @smoke
+    ✔ Login fallido con usuario bloqueado / contraseña incorrecta          @negative (x3)
+    ✔ Agregar dos productos al carrito y verificar badge                   @smoke
+    ✔ Visualizar productos en el carrito con nombre, precio y cantidad
+    ✔ Eliminar un producto del carrito y verificar conteo actualizado
+    ✔ Completar formulario de checkout con datos válidos                   @smoke
+    ✔ Checkout con campos obligatorios vacíos (nombre/apellido/postal)     @negative (x3)
+    ✔ Finalizar compra y confirmar "Thank you for your order!"             @smoke @regression
+
+  API (Cypress + Cucumber — Petstore):                             [7 scenarios / 10 tests]
+    ✔ POST /pet — Crear mascota con nombre y estado                        @smoke
+    ✔ POST /pet — Body vacío retorna 200 (API permisiva)                   @negative
+    ✔ POST /pet — ID no numérico retorna 500 (error interno del servidor)  @negative
+    ✔ GET  /pet/{id} — Consultar mascota existente por ID                  @smoke
+    ✔ GET  /pet/{id} — ID inexistente retorna 404 con "Pet not found"      @negative
+    ✔ PUT  /pet — Actualizar nombre y estado                               @smoke
+    ✔ GET  /pet/findByStatus — Verificar mascota en lista por estado       @smoke
+    ✔ PUT  /pet — Actualizar con estados available/pending/sold            (x3)

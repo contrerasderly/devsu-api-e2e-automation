@@ -1,0 +1,27 @@
+# ── Dependencias ──────────────────────────────────
+node_modules/
+
+# ── Cypress — resultados y reportes generados ─────
+cypress/allure-results/
+cypress/allure-report/
+cypress/reports/
+cypress/screenshots/
+cypress/videos/
+
+# ── Logs ──────────────────────────────────────────
+*.log
+npm-debug.log*
+
+# ── Variables de entorno ──────────────────────────
+.env
+.env.local
+.env.*.local
+
+# ── Sistema operativo ─────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ── IDEs ──────────────────────────────────────────
+.idea/
+*.iml
+.vscode/
