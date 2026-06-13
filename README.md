@@ -13,7 +13,7 @@ Cypress: ^15.17.0 | Framework de automatización
 Allure CLI | >= 2.24 | Reportes HTML interactivos
 
 ## Estructura del proyecto
-
+```bash
 devsu-api-e2e-automation/
 ├── .gitignore
 ├── README.md
@@ -39,7 +39,7 @@ devsu-api-e2e-automation/
             ├── InventoryPage.js
             ├── CartPage.js
             └── CheckoutPage.js
-
+```
 ## Requisitos previos
 Antes de instalar, asegúrate de tener:
 
