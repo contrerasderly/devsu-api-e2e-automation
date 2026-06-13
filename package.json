@@ -1,15 +1,25 @@
 {
   "name": "devsu-qa-automation",
   "version": "1.0.0",
-  "description": "Devsu QA Automation — E2E (Cypress) + API (Karate)",
+  "description": "Devsu QA Automation — E2E + API (Cypress + Cucumber + Allure)",
   "scripts": {
-    "test": "concurrently --names \"API,E2E\" --prefix-colors \"bgBlue.white,bgGreen.white\" --kill-others-on-fail \"npm run test:api\" \"npm run test:e2e\"",
-    "test:api": "cd api && mvn clean test",
-    "test:e2e": "cd e2e && npm run cy:open",
-    "report:api": "cd api && mvn allure:serve",
-    "report:e2e": "cd e2e && npm run allure:serve"
+    "test": "env -u ELECTRON_RUN_AS_NODE cypress run --headless --browser chrome --env allure=true",
+    "test:api": "env -u ELECTRON_RUN_AS_NODE cypress run --headless --browser chrome --env allure=true --spec 'cypress/e2e/petstore/**/*.feature'",
+    "test:e2e": "env -u ELECTRON_RUN_AS_NODE cypress run --headless --browser chrome --env allure=true --spec 'cypress/e2e/saucedemo/**/*.feature'",
+    "open": "env -u ELECTRON_RUN_AS_NODE cypress open",
+    "report": "allure serve cypress/allure-results",
+    "report:generate": "allure generate cypress/allure-results --clean -o cypress/allure-report",
+    "report:open": "allure open cypress/allure-report"
   },
   "devDependencies": {
-    "concurrently": "^8.2.2"
+    "@badeball/cypress-cucumber-preprocessor": "^24.0.1",
+    "@bahmutov/cypress-esbuild-preprocessor": "^2.2.5",
+    "@shelex/cypress-allure-plugin": "^2.40.2",
+    "cypress": "^15.17.0"
+  },
+  "cypress-cucumber-preprocessor": {
+    "stepDefinitions": [
+      "cypress/support/step_definitions/**/*.js"
+    ]
   }
 }

@@ -1,9 +1,0 @@
-target/
-allure-results/
-*.class
-*.jar
-.classpath
-.project
-.settings/
-*.iml
-.idea/
